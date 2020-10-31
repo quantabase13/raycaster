@@ -3,12 +3,18 @@
 #include "raycaster_float.h"
 #include <math.h>
 
+
+
+
 bool RayCasterFloat::IsWall(float rayX, float rayY)
 {
     float mapX = 0;
     float mapY = 0;
+
+
     float offsetX = modff(rayX, &mapX);
     float offsetY = modff(rayY, &mapY);
+
     int tileX = static_cast<int>(mapX);
     int tileY = static_cast<int>(mapY);
 
@@ -34,6 +40,7 @@ float RayCasterFloat::Distance(float playerX,
 
     int tileStepX = 1;
     int tileStepY = 1;
+
     float tileX = 0;
     float tileY = 0;
     if (rayA > M_PI) {
@@ -126,6 +133,7 @@ float RayCasterFloat::Distance(float playerX,
     float deltaX = rayX - playerX;
     float deltaY = rayY - playerY;
     return sqrt(deltaX * deltaX + deltaY * deltaY);
+
 }
 
 void RayCasterFloat::Trace(uint16_t screenX,
@@ -142,13 +150,31 @@ void RayCasterFloat::Trace(uint16_t screenX,
     float lineDistance = Distance(_playerX, _playerY, _playerA + deltaAngle,
                                   &hitOffset, &hitDirection);
     float distance = lineDistance * cos(deltaAngle);
+
     float dum;
     *textureX = (uint8_t)(256.0f * modff(hitOffset, &dum));
     *textureNo = hitDirection;
     *textureY = 0;
     *textureStep = 0;
+    float Height;
     if (distance > 0) {
         *screenY = INV_FACTOR / distance;
+        float f = INV_FACTOR / distance;
+        unsigned int ui;
+        if (f > 256) {
+            *screenY = SCREEN_HEIGHT >> 1;
+            auto txs = (INV_FACTOR / distance * 2.0f);
+            if (txs != 0) {
+                *textureStep = (256 / txs) * 256;
+                if (txs > SCREEN_HEIGHT) {
+                    auto wallHeight = (txs - SCREEN_HEIGHT) / 2;
+                    Height = wallHeight;
+                    *textureY = wallHeight * (256 / txs) * 256;
+                }
+            }
+            return;
+        }
+
         auto txs = (*screenY * 2.0f);
         if (txs != 0) {
             *textureStep = (256 / txs) * 256;
@@ -160,6 +186,7 @@ void RayCasterFloat::Trace(uint16_t screenX,
     } else {
         *screenY = 0;
     }
+
 }
 
 void RayCasterFloat::Start(uint16_t playerX, uint16_t playerY, int16_t playerA)
