@@ -4,6 +4,7 @@
 #include "raycaster_data.h"
 #include "raycaster_tables.h"
 
+
 // (v * f) >> 8
 uint16_t RayCasterFixed::MulU(uint8_t v, uint16_t f)
 {
@@ -73,12 +74,12 @@ void RayCasterFixed::LookupHeight(uint16_t distance,
 {
     if (distance >= 256) {
         const uint16_t ds = distance >> 3;
+        *height = LOOKUP8(g_farHeight, ds);
+        *step = LOOKUP16(g_farStep, ds);
         if (ds >= 256) {
             *height = LOOKUP8(g_farHeight, 255) - 1;
             *step = LOOKUP16(g_farStep, 255);
         }
-        *height = LOOKUP8(g_farHeight, ds);
-        *step = LOOKUP16(g_farStep, ds);
     } else {
         *height = LOOKUP8(g_nearHeight, distance);
         *step = LOOKUP16(g_nearStep, distance);
@@ -137,6 +138,7 @@ void RayCasterFixed::CalculateDistance(uint16_t rayX,
             }
             break;
         }
+
     } else {
         int16_t stepX;
         int16_t stepY;
@@ -168,12 +170,17 @@ void RayCasterFixed::CalculateDistance(uint16_t rayX,
         case 1:
         case 2:
             tileStepY = -1;
+            int16_t tmp = interceptX;
             interceptX -= MulTan(offsetY, false, quarter, angle, g_tan);
             stepY = -AbsTan(quarter, angle, g_cotan);
             break;
         }
-
         for (;;) {
+            auto ty = (tileY - tileStepY) * 256;
+            if ((tileStepY == -1 && ty < interceptY) ||
+                (tileStepY == 1 && ty > interceptY))
+                interceptY = ty;
+
             while ((tileStepY == 1 && (interceptY >> 8 < tileY)) ||
                    (tileStepY == -1 && (interceptY >> 8 >= tileY))) {
                 tileX += tileStepX;
@@ -181,6 +188,11 @@ void RayCasterFixed::CalculateDistance(uint16_t rayX,
                     goto VerticalHit;
                 }
                 interceptY += stepY;
+            }
+            auto tx = (tileX - tileStepX) * 256;
+            if ((tileStepX == -1 && tx < interceptX) ||
+                (tileStepX == 1 && tx > interceptX)) {
+                interceptX = tx;
             }
             while ((tileStepX == 1 && (interceptX >> 8 < tileX)) ||
                    (tileStepX == -1 && (interceptX >> 8 >= tileX))) {
@@ -231,19 +243,22 @@ void RayCasterFixed::Trace(uint16_t screenX,
         rayAngle--;
         break;
     case 2:
+        // break;
     case 255:
         rayAngle++;
         break;
     }
+
     rayAngle %= 1024;
 
     int16_t deltaX;
     int16_t deltaY;
     CalculateDistance(_playerX, _playerY, rayAngle, &deltaX, &deltaY, textureNo,
                       textureX);
-
     // distance = deltaY * cos(playerA) + deltaX * sin(playerA)
+
     int16_t distance = 0;
+
     if (_playerA == 0) {
         distance += deltaY;
     } else if (_playerA == 512) {
